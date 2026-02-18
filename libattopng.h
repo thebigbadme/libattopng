@@ -47,6 +47,7 @@ typedef struct {
     size_t palette_length;       /**< Entries for palette, 0 if unused */
     size_t width;                /**< Image width */
     size_t height;               /**< Image height */
+    size_t slc;                  /**< Scanline count */
 
     char *out;                   /**< Buffer to store final PNG */
     size_t out_pos;              /**< Current size of output buffer */
