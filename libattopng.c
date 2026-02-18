@@ -58,6 +58,7 @@ libattopng_t *libattopng_new(size_t width, size_t height, libattopng_type_t type
     png->type = type;
     png->stream_x = 0;
     png->stream_y = 0;
+    png->slc = height;
 
     switch (type) {
         case PNG_PALETTE:
