@@ -224,21 +224,10 @@ static void libattopng_new_chunk(libattopng_t *png, const char *name, size_t len
 }
 
 /* ------------------------------------------------------------------------ */
-static void libattopng_end_chunk(libattopng_t *png) {
-    libattopng_out_raw_size_t(png, libattopng_swap32(~png->crc), 4);
-}
-
-/* ------------------------------------------------------------------------ */
 //libattopng_out_uint32, libattopng_out_uint16, libattopng_out_uint8
 static void libattopng_out_size_t(libattopng_t* png, size_t val, size_t byte_count) {
     png->crc = libattopng_crc((const unsigned char*) &val, byte_count, png->crc);
     libattopng_out_raw_size_t(png, val, byte_count);
-}
-
-/* ------------------------------------------------------------------------ */
-static void libattopng_out_write(libattopng_t *png, const char *data, size_t len) {
-    png->crc = libattopng_crc((const unsigned char *) data, len, png->crc);
-    libattopng_out_raw_write(png, data, len);
 }
 
 /* ------------------------------------------------------------------------ */
