@@ -252,12 +252,12 @@ static void libattopng_out_write_adler(libattopng_t *png, unsigned char data) {
 static void libattopng_pixel_header(libattopng_t *png, size_t offset, size_t bpl) {
     if (offset > bpl) {
         /* not the last line */
-        libattopng_out_write(png, "\0", 1);
+        libattopng_out_size_t(png, (uint8_t) 0, 1);
         libattopng_out_size_t(png, (uint16_t) bpl, 2);
         libattopng_out_size_t(png, (uint16_t) ~bpl, 2);
     } else {
         /* last line */
-        libattopng_out_write(png, "\1", 1);
+        libattopng_out_size_t(png, (uint8_t) 1, 1);
         libattopng_out_size_t(png, (uint16_t) offset, 2);
         libattopng_out_size_t(png, (uint16_t) ~offset, 2);
     }
