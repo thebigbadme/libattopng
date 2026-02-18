@@ -203,6 +203,9 @@ static void libattopng_out_raw_size_t(libattopng_t* png, size_t val, size_t byte
         case 4: //libattopng_out_raw_uint(libattopng_t* png, uint32_t val)
             *(uint32_t*) (png->out + png->out_pos) = (uint32_t)(val & 0xffffffff);
             break;
+        case 3:
+            *(uint32_t*) (png->out + png->out_pos) = (uint32_t)(val & 0x00ffffff);
+            break;
         case 2: //libattopng_out_raw_uint16(libattopng_t* png, uint16_t val)
             *(uint16_t*) (png->out + png->out_pos) = (uint16_t)(val & 0xffff);
             break;
