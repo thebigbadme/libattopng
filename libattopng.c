@@ -292,31 +292,26 @@ char *libattopng_get_data(libattopng_t *png, size_t *len) {
     libattopng_out_size_t(png, 0, 1); /* compression */
     libattopng_out_size_t(png, 0, 1); /* filter */
     libattopng_out_size_t(png, 0, 1); /* interlace method */
-    libattopng_end_chunk(png);
+    libattopng_out_raw_size_t(png, libattopng_swap32(~png->crc), 4);
 
     /* palette */
     if (png->type == PNG_PALETTE) {
-        char entry[3];
         size_t s = png->palette_length * sizeof(uint32_t);
         if (s < 16) {
             s = 16; /* minimum palette length */
         }
         libattopng_new_chunk(png, "PLTE", 3 * s);
         for (index = 0; index < s; index++) {
-            entry[0] = (char) (png->palette[index] & 255);
-            entry[1] = (char) ((png->palette[index] >> 8) & 255);
-            entry[2] = (char) ((png->palette[index] >> 16) & 255);
-            libattopng_out_write(png, entry, 3);
+            libattopng_out_size_t(png, (uint32_t)16777215 & png->palette[index], 3);
         }
-        libattopng_end_chunk(png);
+        libattopng_out_raw_size_t(png, libattopng_swap32(~png->crc), 4);
 
         /* transparency */
         libattopng_new_chunk(png, "tRNS", s);
         for (index = 0; index < s; index++) {
-            entry[0] = (char) ((png->palette[index] >> 24) & 255);
-            libattopng_out_write(png, entry, 1);
+            libattopng_out_size_t(png, (uint8_t) ((png->palette[index] >> 24) & 255), 1);
         }
-        libattopng_end_chunk(png);
+        libattopng_out_raw_size_t(png, libattopng_swap32(~png->crc), 4);
     }
 
     /* data */
@@ -328,7 +323,7 @@ char *libattopng_get_data(libattopng_t *png, size_t *len) {
     raw_size = png->height * bpl;
     size = 2 + png->height * (5 + bpl) + 4;
     libattopng_new_chunk(png, "IDAT", size);
-    libattopng_out_write(png, "\170\332", 2);
+    libattopng_out_size_t(png, (uint16_t)30840, 2);
 
     pixel = (unsigned char *) png->data;
     png->s1 = 1;
@@ -361,11 +356,11 @@ char *libattopng_get_data(libattopng_t *png, size_t *len) {
     png->s1 %= LIBATTOPNG_ADLER_BASE;
     png->s2 %= LIBATTOPNG_ADLER_BASE;
     libattopng_out_size_t(png, libattopng_swap32((uint32_t) ((png->s2 << 16) | png->s1)), 4);
-    libattopng_end_chunk(png);
+    libattopng_out_raw_size_t(png, libattopng_swap32(~png->crc), 4);
 
     /* end of image */
     libattopng_new_chunk(png, "IEND", 0);
-    libattopng_end_chunk(png);
+    libattopng_out_raw_size_t(png, libattopng_swap32(~png->crc), 4);
 
     if (len) {
         *len = png->out_pos;
