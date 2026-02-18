@@ -189,7 +189,7 @@ void libattopng_put_pixel(libattopng_t *png, uint32_t color);
  * @param len  The length of the data stream is written to this output parameter
  * @return A reference to the PNG output stream
  * @note The data stream is free'd when calling \ref libattopng_destroy and
- *       must not be free'd be the caller
+ *       must not be free'd by the caller
  */
 char *libattopng_get_data(libattopng_t *png, size_t *len);
 
