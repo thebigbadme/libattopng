@@ -22,7 +22,7 @@ int main(int argc, char *argv[]) {
             RGBA(0xff, 0, 0, 0xff),
             RGBA(0xff, 0, 0xff, 0x80)
     };
-    libattopng_set_palette(png, palette, 16);
+    libattopng_set_palette(png, palette, 4);
 
     for (y = 0; y < H; y++) {
         for (x = 0; x < W; x++) {
