@@ -125,9 +125,9 @@ void libattopng_set_pixel(libattopng_t *png, size_t x, size_t y, uint32_t color)
 
 /* ------------------------------------------------------------------------ */
 uint32_t libattopng_get_pixel(libattopng_t* png, size_t x, size_t y) {
-    uint32_t pixel = 0; /* initialized to black */
+    uint32_t pixel = 0;
     if (!png || x >= png->width || y >= png->height) {
-        return pixel; /* error pixel is black*/
+        return pixel;
     }
     if (png->type == PNG_PALETTE || png->type == PNG_GRAYSCALE) {
         pixel = (uint32_t)(png->data[x + y * png->width] & 0xff);
@@ -177,7 +177,6 @@ void libattopng_put_pixel(libattopng_t* png, uint32_t color) {
     }
     png->stream_x = x;
     png->stream_y = y;
-    return;
 }
 
 /* ------------------------------------------------------------------------ */
@@ -204,7 +203,6 @@ static void libattopng_out_raw_write(libattopng_t *png, const char *data, size_t
 }
 
 /* ------------------------------------------------------------------------ */
-
 static void libattopng_out_raw_size_t(libattopng_t* png, size_t val, size_t byte_count) {
     switch (byte_count) {
         case 4: //libattopng_out_raw_uint(libattopng_t* png, uint32_t val)
