@@ -39,6 +39,10 @@ static const uint32_t libattopng_crc32[256] = {
 /* ------------------------------------------------------------------------ */
 libattopng_t *libattopng_new(size_t width, size_t height, libattopng_type_t type) {
     libattopng_t *png;
+    if (width < 1 || height < 1) {
+        /* ensure at least a single pixel */
+        return NULL;
+    }
     if (SIZE_MAX / 4 / width < height) {
         /* ensure no type leads to an integer overflow */
         return NULL;
@@ -58,6 +62,7 @@ libattopng_t *libattopng_new(size_t width, size_t height, libattopng_type_t type
     png->type = type;
     png->stream_x = 0;
     png->stream_y = 0;
+    png->slc = height;
 
     switch (type) {
         case PNG_PALETTE:
@@ -120,9 +125,9 @@ void libattopng_set_pixel(libattopng_t *png, size_t x, size_t y, uint32_t color)
 
 /* ------------------------------------------------------------------------ */
 uint32_t libattopng_get_pixel(libattopng_t* png, size_t x, size_t y) {
-    uint32_t pixel = 0;
+    uint32_t pixel = 0; /* initialized to black */
     if (!png || x >= png->width || y >= png->height) {
-        return pixel;
+        return pixel; /* error pixel is black*/
     }
     if (png->type == PNG_PALETTE || png->type == PNG_GRAYSCALE) {
         pixel = (uint32_t)(png->data[x + y * png->width] & 0xff);
@@ -172,6 +177,7 @@ void libattopng_put_pixel(libattopng_t* png, uint32_t color) {
     }
     png->stream_x = x;
     png->stream_y = y;
+    return;
 }
 
 /* ------------------------------------------------------------------------ */
@@ -198,14 +204,15 @@ static void libattopng_out_raw_write(libattopng_t *png, const char *data, size_t
 }
 
 /* ------------------------------------------------------------------------ */
+
 static void libattopng_out_raw_size_t(libattopng_t* png, size_t val, size_t byte_count) {
     switch (byte_count) {
         case 4: //libattopng_out_raw_uint(libattopng_t* png, uint32_t val)
             *(uint32_t*) (png->out + png->out_pos) = (uint32_t)(val & 0xffffffff);
             break;
-
-
-
+        case 3:
+            *(uint32_t*) (png->out + png->out_pos) = (uint32_t)(val & 0x00ffffff);
+            break;
         case 2: //libattopng_out_raw_uint16(libattopng_t* png, uint16_t val)
             *(uint16_t*) (png->out + png->out_pos) = (uint16_t)(val & 0xffff);
             break;
@@ -224,26 +231,14 @@ static void libattopng_new_chunk(libattopng_t *png, const char *name, size_t len
 }
 
 /* ------------------------------------------------------------------------ */
-static void libattopng_end_chunk(libattopng_t *png) {
-    libattopng_out_raw_size_t(png, libattopng_swap32(~png->crc), 4);
-}
-
-/* ------------------------------------------------------------------------ */
-//libattopng_out_uint32, libattopng_out_uint16, libattopng_out_uint8
 static void libattopng_out_size_t(libattopng_t* png, size_t val, size_t byte_count) {
     png->crc = libattopng_crc((const unsigned char*) &val, byte_count, png->crc);
     libattopng_out_raw_size_t(png, val, byte_count);
 }
 
 /* ------------------------------------------------------------------------ */
-static void libattopng_out_write(libattopng_t *png, const char *data, size_t len) {
-    png->crc = libattopng_crc((const unsigned char *) data, len, png->crc);
-    libattopng_out_raw_write(png, data, len);
-}
-
-/* ------------------------------------------------------------------------ */
 static void libattopng_out_write_adler(libattopng_t *png, unsigned char data) {
-    libattopng_out_write(png, (char *) &data, 1);
+    libattopng_out_size_t(png, data, 1);
     png->s1 = (uint16_t) ((png->s1 + data) % LIBATTOPNG_ADLER_BASE);
     png->s2 = (uint16_t) ((png->s2 + png->s1) % LIBATTOPNG_ADLER_BASE);
 }
@@ -252,12 +247,12 @@ static void libattopng_out_write_adler(libattopng_t *png, unsigned char data) {
 static void libattopng_pixel_header(libattopng_t *png, size_t offset, size_t bpl) {
     if (offset > bpl) {
         /* not the last line */
-        libattopng_out_write(png, "\0", 1);
+        libattopng_out_size_t(png, (uint8_t) 0, 1);
         libattopng_out_size_t(png, (uint16_t) bpl, 2);
         libattopng_out_size_t(png, (uint16_t) ~bpl, 2);
     } else {
         /* last line */
-        libattopng_out_write(png, "\1", 1);
+        libattopng_out_size_t(png, (uint8_t) 1, 1);
         libattopng_out_size_t(png, (uint16_t) offset, 2);
         libattopng_out_size_t(png, (uint16_t) ~offset, 2);
     }
@@ -265,7 +260,8 @@ static void libattopng_pixel_header(libattopng_t *png, size_t offset, size_t bpl
 
 /* ------------------------------------------------------------------------ */
 char *libattopng_get_data(libattopng_t *png, size_t *len) {
-    size_t index, bpl, raw_size, size, p, pos, corr;
+    size_t index, bpl, raw_size, size, p, pos, corr, s;
+    size_t psl;
     unsigned char *pixel;
     if (!png) {
         return NULL;
@@ -274,7 +270,20 @@ char *libattopng_get_data(libattopng_t *png, size_t *len) {
         /* delete old output if any */
         free(png->out);
     }
-    png->out_capacity = png->capacity + 4096 * 8 + png->width * png->height;
+    psl = png->width;
+    bpl = 1 + png->bpp * png->width;
+    if (bpl >= 65536) {
+        fprintf(stderr, "[libattopng] ERROR: maximum supported width for this type of PNG is %d pixel\n", (int)(65535 / png->bpp));
+        return NULL;
+    }
+    png->out_capacity = 57; /* size of all manditory chunk wrappers + file header bytes */
+    if (png->type == PNG_PALETTE) {
+        s = png->palette_length * sizeof(uint32_t);
+        png->out_capacity += (24 + 4 * s);
+    }
+    raw_size = png->height * png->width * png->bpp + png->slc;
+    size = 2 + png->slc * 5 + raw_size + 4;
+    png->out_capacity += size;
     png->out = (char *) calloc(png->out_capacity, 1);
     png->out_pos = 0;
     if (!png->out) {
@@ -290,46 +299,32 @@ char *libattopng_get_data(libattopng_t *png, size_t *len) {
     libattopng_out_size_t(png, 8, 1); /* bit depth */
     libattopng_out_size_t(png, (uint8_t) png->type, 1);
     libattopng_out_size_t(png, 0, 1); /* compression */
-    libattopng_out_size_t(png, 0, 1); /* filter */
-    libattopng_out_size_t(png, 0, 1); /* interlace method */
-    libattopng_end_chunk(png);
+    libattopng_out_size_t(png, (uint8_t)0, 1); /* filter method*/
+    libattopng_out_size_t(png, (uint8_t) 0, 1); /* interlace method */
+    libattopng_out_raw_size_t(png, libattopng_swap32(~png->crc), 4);
 
     /* palette */
     if (png->type == PNG_PALETTE) {
-        char entry[3];
-        size_t s = png->palette_length * sizeof(uint32_t);
-        if (s < 16) {
-            s = 16; /* minimum palette length */
+        if (s < 16) {/* minimum palette length */
+            s = 16;
         }
         libattopng_new_chunk(png, "PLTE", 3 * s);
         for (index = 0; index < s; index++) {
-            entry[0] = (char) (png->palette[index] & 255);
-            entry[1] = (char) ((png->palette[index] >> 8) & 255);
-            entry[2] = (char) ((png->palette[index] >> 16) & 255);
-            libattopng_out_write(png, entry, 3);
+            libattopng_out_size_t(png, (uint32_t)16777215 & png->palette[index], 3);
         }
-        libattopng_end_chunk(png);
+        libattopng_out_raw_size_t(png, libattopng_swap32(~png->crc), 4);
 
         /* transparency */
         libattopng_new_chunk(png, "tRNS", s);
         for (index = 0; index < s; index++) {
-            entry[0] = (char) ((png->palette[index] >> 24) & 255);
-            libattopng_out_write(png, entry, 1);
+            libattopng_out_size_t(png, (uint8_t) ((png->palette[index] >> 24) & 255), 1);
         }
-        libattopng_end_chunk(png);
+        libattopng_out_raw_size_t(png, libattopng_swap32(~png->crc), 4);
     }
 
     /* data */
-    bpl = 1 + png->bpp * png->width;
-    if (bpl >= 65536) {
-        fprintf(stderr, "[libattopng] ERROR: maximum supported width for this type of PNG is %d pixel\n", (int)(65535 / png->bpp));
-        return NULL;
-    }
-    raw_size = png->height * bpl;
-    size = 2 + png->height * (5 + bpl) + 4;
     libattopng_new_chunk(png, "IDAT", size);
-    libattopng_out_write(png, "\170\332", 2);
-
+    libattopng_out_size_t(png, (uint16_t)55928, 2);
     pixel = (unsigned char *) png->data;
     png->s1 = 1;
     png->s2 = 0;
@@ -343,7 +338,7 @@ char *libattopng_get_data(libattopng_t *png, size_t *len) {
         if (index == 0) {
             /* line header */
             libattopng_pixel_header(png, raw_size, bpl);
-            libattopng_out_write_adler(png, 0); /* no filter */
+            libattopng_out_write_adler(png, 0); /* filter-type byte */
             raw_size--;
         }
 
@@ -353,20 +348,19 @@ char *libattopng_get_data(libattopng_t *png, size_t *len) {
             pixel++;
         }
         pixel += corr;
-
         raw_size -= png->bpp;
-        index = (index + 1) % png->width;
+        index = (index + 1) % psl;
     }
+
     /* checksum */
     png->s1 %= LIBATTOPNG_ADLER_BASE;
     png->s2 %= LIBATTOPNG_ADLER_BASE;
     libattopng_out_size_t(png, libattopng_swap32((uint32_t) ((png->s2 << 16) | png->s1)), 4);
-    libattopng_end_chunk(png);
+    libattopng_out_raw_size_t(png, libattopng_swap32(~png->crc), 4);
 
     /* end of image */
     libattopng_new_chunk(png, "IEND", 0);
-    libattopng_end_chunk(png);
-
+    libattopng_out_raw_size_t(png, libattopng_swap32(~png->crc), 4);
     if (len) {
         *len = png->out_pos;
     }
