@@ -33,6 +33,15 @@ typedef enum {
     PNG_RGBA = 6                /**< 24bit RGB values plus 8bit alpha channel */
 } libattopng_type_t;
 
+/**
+ * @brief PNG type.
+ *
+ * The type of PNG image. It determines how the pixels are stored.
+ */
+typedef enum{
+    NO = 0,
+    ADAM = 1
+} libattopng_interlace_t;
 
 /**
  * @brief Reference to a PNG image
@@ -40,14 +49,15 @@ typedef enum {
  * This struct holds the internal state of the PNG. The members should never be used directly.
  */
 typedef struct {
-    libattopng_type_t type;      /**< File type */
-    size_t capacity;             /**< Reserved memory for raw data */
-    char *data;                  /**< Raw pixel data, format depends on type */
-    uint32_t *palette;           /**< Palette for image */
-    size_t palette_length;       /**< Entries for palette, 0 if unused */
-    size_t width;                /**< Image width */
-    size_t height;               /**< Image height */
-    size_t slc;                  /**< Scanline count */
+    libattopng_type_t type;           /**< File type */
+    size_t capacity;                  /**< Reserved memory for raw data */
+    char *data;                       /**< Raw pixel data, format depends on type */
+    uint32_t *palette;                /**< Palette for image */
+    size_t palette_length;            /**< Entries for palette, 0 if unused */
+    size_t width;                     /**< Image width */
+    size_t height;                    /**< Image height */
+    size_t slc;                       /**< Scanline count */
+    libattopng_interlace_t interlace; /**< Interlace method, 1 byte used*/
 
     char *out;                   /**< Buffer to store final PNG */
     size_t out_pos;              /**< Current size of output buffer */
@@ -75,6 +85,7 @@ typedef struct {
  *                  - PNG_PALETTE (palette with up to 256 entries, each 32bit RGBA)
  *                  - PNG_RGB (24bit RGB values)
  *                  - PNG_RGBA (32bit RGB values with alpha)
+ * @param interlace The interlace method used.
  * @return reference to a PNG image to be used with all other functions or NULL on error.
  *          Possible errors are:
  *              - Out of memory
@@ -82,7 +93,7 @@ typedef struct {
  * @note It's the callers responsibility to free the data structure.
  *       See @ref libattopng_destroy
  */
-libattopng_t *libattopng_new(size_t width, size_t height, libattopng_type_t type);
+libattopng_t *libattopng_new(size_t width, size_t height, libattopng_type_t type, libattopng_interlace_t interlace);
 
 
 /**
