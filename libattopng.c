@@ -256,8 +256,8 @@ static void libattopng_pixel_header(libattopng_t *png, size_t offset, size_t bpl
 
 /* ------------------------------------------------------------------------ */
 char *libattopng_get_data(libattopng_t *png, size_t *len) {
-    size_t index, bpl, raw_size, size, p, pos, corr, s;
-    size_t psl;
+    size_t index, bpl, raw_size, idat_size, p, pos, alpha_corr, pal_len_size;
+    size_t scanlines, psl;
     unsigned char *pixel;
     if (!png) {
         return NULL;
@@ -266,20 +266,26 @@ char *libattopng_get_data(libattopng_t *png, size_t *len) {
         /* delete old output if any */
         free(png->out);
     }
+    scanlines = png->slc;
     psl = png->width;
-    bpl = 1 + png->bpp * png->width;
-    if (bpl >= 65536) {
+    bpl = png->bpp * png->width;
+    if (bpl >= 65535) {
         fprintf(stderr, "[libattopng] ERROR: maximum supported width for this type of PNG is %d pixel\n", (int)(65535 / png->bpp));
         return NULL;
     }
     png->out_capacity = 57; /* size of all manditory chunk wrappers + file header bytes */
     if (png->type == PNG_PALETTE) {
-        s = png->palette_length * sizeof(uint32_t);
-        png->out_capacity += (24 + 4 * s);
+        pal_len_size = png->palette_length * sizeof(uint32_t);
+        png->out_capacity += (24 + 4 * pal_len_size);
     }
-    raw_size = png->height * png->width * png->bpp + png->slc;
-    size = 2 + png->slc * 5 + raw_size + 4;
-    png->out_capacity += size;
+    if (png->type == PNG_RGB) {
+        alpha_corr = 1;
+    } else {
+        alpha_corr = 0;
+    }
+    raw_size = png->height * png->width * png->bpp;
+    idat_size = 2 + png->slc * 6 + raw_size + 4;
+    png->out_capacity += idat_size;
     png->out = (char *) calloc(png->out_capacity, 1);
     png->out_pos = 0;
     if (!png->out) {
@@ -301,41 +307,40 @@ char *libattopng_get_data(libattopng_t *png, size_t *len) {
 
     /* palette */
     if (png->type == PNG_PALETTE) {
-        if (s < 16) {/* minimum palette length */
-            s = 16;
+        if (pal_len_size < 16) {/* minimum palette length */
+            pal_len_size = 16;
         }
-        libattopng_new_chunk(png, "PLTE", 3 * s);
-        for (index = 0; index < s; index++) {
+        libattopng_new_chunk(png, "PLTE", 3 * pal_len_size);
+        for (index = 0; index < pal_len_size; index++) {
             libattopng_out_size_t(png, (uint32_t)16777215 & png->palette[index], 3);
         }
         libattopng_out_raw_size_t(png, libattopng_swap32(~png->crc), 4);
 
         /* transparency */
-        libattopng_new_chunk(png, "tRNS", s);
-        for (index = 0; index < s; index++) {
+        libattopng_new_chunk(png, "tRNS", pal_len_size);
+        for (index = 0; index < pal_len_size; index++) {
             libattopng_out_size_t(png, (uint8_t) ((png->palette[index] >> 24) & 255), 1);
         }
         libattopng_out_raw_size_t(png, libattopng_swap32(~png->crc), 4);
     }
 
     /* data */
-    libattopng_new_chunk(png, "IDAT", size);
-    libattopng_out_size_t(png, (uint16_t)55928, 2);
+    libattopng_new_chunk(png, "IDAT", idat_size);
+    uint8_t cm = 8;
+    uint8_t cinfo = 7;
+    uint8_t cmf = (cm | (cinfo << 4));
+    uint8_t flags = 218;
+    libattopng_out_size_t(png, (uint16_t)(cmf | (flags << 8)), 2);
     pixel = (unsigned char *) png->data;
     png->s1 = 1;
     png->s2 = 0;
     index = 0;
-    if (png->type == PNG_RGB) {
-        corr = 1;
-    } else {
-        corr = 0;
-    }
     for (pos = 0; pos < png->width * png->height; pos++) {
         if (index == 0) {
             /* line header */
-            libattopng_pixel_header(png, raw_size, bpl);
+            libattopng_pixel_header(png, raw_size + scanlines, bpl+1);
             libattopng_out_write_adler(png, 0); /* filter-type byte */
-            raw_size--;
+            scanlines--;
         }
 
         /* pixel */
@@ -343,7 +348,7 @@ char *libattopng_get_data(libattopng_t *png, size_t *len) {
             libattopng_out_write_adler(png, *pixel);
             pixel++;
         }
-        pixel += corr;
+        pixel += alpha_corr;
         raw_size -= png->bpp;
         index = (index + 1) % psl;
     }
