@@ -37,7 +37,7 @@ static const uint32_t libattopng_crc32[256] = {
 };
 
 /* ------------------------------------------------------------------------ */
-libattopng_t *libattopng_new(size_t width, size_t height, libattopng_type_t type) {
+libattopng_t *libattopng_new(size_t width, size_t height, libattopng_type_t type, libattopng_interlace_t interlace) {
     libattopng_t *png;
     if (width < 1 || height < 1) {
         /* ensure at least a single pixel */
@@ -60,10 +60,14 @@ libattopng_t *libattopng_new(size_t width, size_t height, libattopng_type_t type
     png->out_capacity = 0;
     png->out_pos = 0;
     png->type = type;
+    png->interlace = interlace;
     png->stream_x = 0;
     png->stream_y = 0;
-    png->slc = height;
+    png->slc = 0;
 
+    if (interlace == NO) {
+        png->slc = height;
+    }
     switch (type) {
         case PNG_PALETTE:
             png->palette = (uint32_t *) calloc(256, sizeof(uint32_t));
@@ -267,7 +271,9 @@ char *libattopng_get_data(libattopng_t *png, size_t *len) {
         free(png->out);
     }
     scanlines = png->slc;
-    psl = png->width;
+    if (png->interlace == NO) {
+        psl = png->width;
+    }
     bpl = png->bpp * png->width;
     if (bpl >= 65535) {
         fprintf(stderr, "[libattopng] ERROR: maximum supported width for this type of PNG is %d pixel\n", (int)(65535 / png->bpp));
@@ -284,7 +290,7 @@ char *libattopng_get_data(libattopng_t *png, size_t *len) {
         alpha_corr = 0;
     }
     raw_size = png->height * png->width * png->bpp;
-    idat_size = 2 + png->slc * 6 + raw_size + 4;
+    idat_size = 2 + scanlines * 6 + raw_size + 4;
     png->out_capacity += idat_size;
     png->out = (char *) calloc(png->out_capacity, 1);
     png->out_pos = 0;
@@ -302,7 +308,7 @@ char *libattopng_get_data(libattopng_t *png, size_t *len) {
     libattopng_out_size_t(png, (uint8_t) png->type, 1);
     libattopng_out_size_t(png, 0, 1); /* compression */
     libattopng_out_size_t(png, (uint8_t)0, 1); /* filter method*/
-    libattopng_out_size_t(png, (uint8_t) 0, 1); /* interlace method */
+    libattopng_out_size_t(png, (uint8_t) png->interlace, 1); /* interlace method */
     libattopng_out_raw_size_t(png, libattopng_swap32(~png->crc), 4);
 
     /* palette */
