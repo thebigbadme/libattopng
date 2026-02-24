@@ -208,9 +208,6 @@ static void libattopng_out_raw_size_t(libattopng_t* png, size_t val, size_t byte
         case 4: //libattopng_out_raw_uint(libattopng_t* png, uint32_t val)
             *(uint32_t*) (png->out + png->out_pos) = (uint32_t)(val & 0xffffffff);
             break;
-        case 3:
-            *(uint32_t*) (png->out + png->out_pos) = (uint32_t)(val & 0x00ffffff);
-            break;
         case 2: //libattopng_out_raw_uint16(libattopng_t* png, uint16_t val)
             *(uint16_t*) (png->out + png->out_pos) = (uint16_t)(val & 0xffff);
             break;
@@ -231,7 +228,8 @@ static void libattopng_new_chunk(libattopng_t *png, const char *name, size_t len
 /* ------------------------------------------------------------------------ */
 static void libattopng_out_size_t(libattopng_t* png, size_t val, size_t byte_count) {
     png->crc = libattopng_crc((const unsigned char*) &val, byte_count, png->crc);
-    libattopng_out_raw_size_t(png, val, byte_count);
+    memcpy(png->out+png->out_pos, &val, byte_count);
+    png->out_pos+=byte_count;
 }
 
 /* ------------------------------------------------------------------------ */
