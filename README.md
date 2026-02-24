@@ -14,7 +14,7 @@ Using `libattopng` is as simple as adding both `libattopng.h` and `libattopng.c`
 ```C
 #define RGBA(r, g, b, a) ((r) | ((g) << 8) | ((b) << 16) | ((a) << 24))
 
-libattopng_t* png = libattopng_new(250, 200, PNG_RGBA);
+libattopng_t* png = libattopng_new(250, 200, PNG_RGBA, NO);
 
 int x, y;
 for (y = 0; y < 200; y++) {
@@ -31,7 +31,7 @@ libattopng_destroy(png);
 #define RGBA(r, g, b, a) ((r) | ((g) << 8) | ((b) << 16) | ((a) << 24))
 
 // ceate palette image
-libattopng_t *png = libattopng_new(256, 256, PNG_PALETTE);
+libattopng_t *png = libattopng_new(256, 256, PNG_PALETTE, NO);
 uint32_t palette[] = {RGBA(0, 0, 0xff, 0xff), RGBA(0, 0xff, 0, 0x80), RGBA(0xff, 0, 0, 0xff), RGBA(0xff, 0, 0xff, 0x80)};
 // 4 colors: blue, green (50% alpha), red, cyan (50% alpha) 
 libattopng_set_palette(png, palette, 4);
@@ -95,6 +95,11 @@ Create a new, empty PNG image to be used with all other functions.
         - PNG_PALETTE (palette with up to 256 entries, each 32bit RGBA)
         - PNG_RGB (24bit RGB values)
         - PNG_RGBA (32bit RGB values with alpha)
+  
+- `interlace`: The interlace method. Possible values are
+
+        - NO (no interlacing)
+        - ADAM (Adam7 interlacing)
 
 **Returns:**
 
