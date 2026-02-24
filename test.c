@@ -15,7 +15,7 @@ int main(int argc, char *argv[]) {
     libattopng_t *png;
     
 ///*
-    png = libattopng_new(W, H, PNG_PALETTE, NONE);
+    png = libattopng_new(W, H, PNG_PALETTE, NO);
     uint32_t palette[] = {
             RGBA(0, 0, 0xff, 0xff),//32 bits = 4 bytes * 8 bits
             RGBA(0, 0xff, 0, 0x80),//32 bits = 4 bytes * 8 bits
@@ -35,7 +35,7 @@ int main(int argc, char *argv[]) {
 //*/
     // -----------------
 ///*
-    png = libattopng_new(W, H, PNG_RGBA, NONE);
+    png = libattopng_new(W, H, PNG_RGBA, NO);
 
     for (y = 0; y < H; y++) {
         for (x = 0; x < W; x++) {
@@ -47,7 +47,7 @@ int main(int argc, char *argv[]) {
 //*/
     // -----------------
 ///*
-    png = libattopng_new(W, H, PNG_RGB, NONE);//capacity = w*h*4, bpp = 3
+    png = libattopng_new(W, H, PNG_RGB, NO);//capacity = w*h*4, bpp = 3
 
     for (y = 0; y < H; y++) {
         for (x = 0; x < W; x++) {
@@ -59,7 +59,7 @@ int main(int argc, char *argv[]) {
 //*/
     // -----------------
 ///*
-    png = libattopng_new(W, H, PNG_GRAYSCALE, NONE);
+    png = libattopng_new(W, H, PNG_GRAYSCALE, NO);
 
     for (y = 0; y < H; y++) {
         for (x = 0; x < W; x++) {
@@ -71,7 +71,7 @@ int main(int argc, char *argv[]) {
 //*/
     // -----------------
 ///*
-    png = libattopng_new(W, H, PNG_GRAYSCALE_ALPHA, NONE);
+    png = libattopng_new(W, H, PNG_GRAYSCALE_ALPHA, NO);
 
     for (y = 0; y < H; y++) {
         for (x = 0; x < W; x++) {
@@ -83,7 +83,7 @@ int main(int argc, char *argv[]) {
 //*/
     // -----------------
 ///*
-    png = libattopng_new(W, H, PNG_GRAYSCALE, NONE);
+    png = libattopng_new(W, H, PNG_GRAYSCALE, NO);
     libattopng_start_stream(png, 0, 0);
 
     for (y = 0; y < H; y++) {
