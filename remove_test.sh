@@ -13,3 +13,5 @@ rm -rf ./build
 [ -e test_palette.png ] && rm -- test_palette.png
 [ -e test_rgb.png ] && rm -- test_rgb.png
 [ -e test_rgba.png ] && rm -- test_rgba.png
+[ -e test_gray_interlace_stream.png ] && rm -- test_gray_interlace_stream.png
+[ -e test_rgba_interlace.png ] && rm -- test_rgba_interlace.png
