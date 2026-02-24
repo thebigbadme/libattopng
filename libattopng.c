@@ -36,6 +36,13 @@ static const uint32_t libattopng_crc32[256] = {
         0xb40bbe37, 0xc30c8ea1, 0x5a05df1b, 0x2d02ef8d
 };
 
+static const size_t libattopng_a7_starting_x[7]    = { 0, 4, 0, 2, 0, 1, 0 };
+static const size_t libattopng_a7_starting_y[7]    = { 0, 0, 4, 0, 2, 0, 1 };
+static const size_t libattopng_a7_x_increment[7]   = { 8, 8, 4, 4, 2, 2, 1 };
+static const size_t libattopng_a7_y_increment[7]   = { 8, 8, 8, 4, 4, 2, 2 };
+static const size_t libattopng_a7_bitshift_x_co[7] = { 3, 3, 2, 2, 1, 1, 0 };
+static const size_t libattopng_a7_bitshift_y_co[7] = { 3, 3, 3, 2, 2, 1, 1 };
+
 /* ------------------------------------------------------------------------ */
 libattopng_t *libattopng_new(size_t width, size_t height, libattopng_type_t type, libattopng_interlace_t interlace) {
     libattopng_t *png;
@@ -67,6 +74,15 @@ libattopng_t *libattopng_new(size_t width, size_t height, libattopng_type_t type
 
     if (interlace == NO) {
         png->slc = height;
+    } else if (interlace == ADAM) {
+        for (int pass = 0; pass < 7; pass++) {
+            if ((libattopng_a7_starting_y[pass] < height) &&
+                (libattopng_a7_starting_x[pass] < width)) {
+                png->slc += 1 + /* (height - starting_y) lands on 1st scanline this pass */
+                            ((height - 1 - libattopng_a7_starting_y[pass]) >>
+                             libattopng_a7_bitshift_y_co[pass]);
+            }
+        }
     }
     switch (type) {
         case PNG_PALETTE:
@@ -261,7 +277,7 @@ static void libattopng_pixel_header(libattopng_t *png, size_t offset, size_t bpl
 /* ------------------------------------------------------------------------ */
 char *libattopng_get_data(libattopng_t *png, size_t *len) {
     size_t index, bpl, raw_size, idat_size, p, pos, alpha_corr, pal_len_size;
-    size_t scanlines, psl;
+    size_t scanlines, psl, x, y, pass;
     unsigned char *pixel;
     if (!png) {
         return NULL;
@@ -271,7 +287,12 @@ char *libattopng_get_data(libattopng_t *png, size_t *len) {
         free(png->out);
     }
     scanlines = png->slc;
-    if (png->interlace == NO) {
+    if (png->interlace == ADAM) {
+        x = 0;
+        y = 0;
+        pass = 0;
+        psl = 1 + ((png->width - 1 - libattopng_a7_starting_x[pass]) >> libattopng_a7_bitshift_x_co[pass]);
+    } else if (png->interlace == NO) {
         psl = png->width;
     }
     bpl = png->bpp * png->width;
@@ -343,6 +364,10 @@ char *libattopng_get_data(libattopng_t *png, size_t *len) {
     index = 0;
     for (pos = 0; pos < png->width * png->height; pos++) {
         if (index == 0) {
+            if (png->interlace == ADAM) {
+                psl = 1 + ((png->width - 1 - libattopng_a7_starting_x[pass]) >> libattopng_a7_bitshift_x_co[pass]);
+                bpl = png->bpp * psl; /* A7 interlace scanlines vary in width */
+            }
             /* line header */
             libattopng_pixel_header(png, raw_size + scanlines, bpl+1);
             libattopng_out_write_adler(png, 0); /* filter-type byte */
@@ -350,13 +375,44 @@ char *libattopng_get_data(libattopng_t *png, size_t *len) {
         }
 
         /* pixel */
-        for (p = 0; p < png->bpp; p++) {
-            libattopng_out_write_adler(png, *pixel);
-            pixel++;
+        if (png->interlace == ADAM) {
+            for (p = 0; p < png->bpp; p++) {
+                libattopng_out_write_adler(png, *(pixel + (x + y * png->width) * (png->bpp + alpha_corr) + p) );
+            }
+        } else {
+            for (p = 0; p < png->bpp; p++) {
+                libattopng_out_write_adler(png, *pixel);
+                pixel++;
+            }
+            pixel += alpha_corr;
         }
-        pixel += alpha_corr;
         raw_size -= png->bpp;
         index = (index + 1) % psl;
+        if (png->interlace == ADAM) {
+            x += libattopng_a7_x_increment[pass];
+            if (x > png->width-1) {
+                y += libattopng_a7_y_increment[pass];
+                if (y > png->height-1) {
+                    do {
+                        pass++;
+                        if ((libattopng_a7_starting_y[pass] < png->height) &&
+                            (libattopng_a7_starting_x[pass] < png->width)) {
+                            break;
+                        } else if (pass == 6) {
+                            pass++; /* make sure we also escape outer loop */
+                        }
+                    } while (pass < 6);
+                    if (pass >= 7) {
+                        break;
+                    } else {
+                        y = libattopng_a7_starting_y[pass];
+                        x = libattopng_a7_starting_x[pass];
+                    }
+                } else {
+                    x = libattopng_a7_starting_x[pass];
+                }
+            }
+        }
     }
 
     /* checksum */
