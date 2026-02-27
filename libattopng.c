@@ -70,20 +70,7 @@ libattopng_t *libattopng_new(size_t width, size_t height, libattopng_type_t type
     png->interlace = interlace;
     png->stream_x = 0;
     png->stream_y = 0;
-    png->slc = 0;
-
-    if (interlace == NO) {
-        png->slc = height;
-    } else if (interlace == ADAM) {
-        for (int pass = 0; pass < 7; pass++) {
-            if ((libattopng_a7_starting_y[pass] < height) &&
-                (libattopng_a7_starting_x[pass] < width)) {
-                png->slc += 1 + /* (height - starting_y) lands on 1st scanline this pass */
-                            ((height - 1 - libattopng_a7_starting_y[pass]) >>
-                             libattopng_a7_bitshift_y_co[pass]);
-            }
-        }
-    }
+    
     switch (type) {
         case PNG_PALETTE:
             png->palette = (uint32_t *) calloc(256, sizeof(uint32_t));
@@ -292,7 +279,17 @@ char *libattopng_get_data(libattopng_t *png, size_t *len) {
         y = 0;
         pass = 0;
         psl = 1 + ((png->width - 1 - libattopng_a7_starting_x[pass]) >> libattopng_a7_bitshift_x_co[pass]);
+        scanlines = 0;
+        for (int pass = 0; pass < 7; pass++) {
+            if ((libattopng_a7_starting_y[pass] < png->height) &&
+                (libattopng_a7_starting_x[pass] < png->width)) {
+                scanlines += 1 + //by taking height - starting_y we land on 1st scanline this pass
+                            ((png->height - 1 - libattopng_a7_starting_y[pass]) >>
+                             libattopng_a7_bitshift_y_co[pass]);
+            }
+        }
     } else if (png->interlace == NO) {
+        scanlines = png->height;
         psl = png->width;
     }
     bpl = png->bpp * png->width;
