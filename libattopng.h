@@ -56,7 +56,6 @@ typedef struct {
     size_t palette_length;            /**< Entries for palette, 0 if unused */
     size_t width;                     /**< Image width */
     size_t height;                    /**< Image height */
-    size_t slc;                       /**< Scanline count */
     libattopng_interlace_t interlace; /**< Interlace method, 1 byte used*/
 
     char *out;                   /**< Buffer to store final PNG */
